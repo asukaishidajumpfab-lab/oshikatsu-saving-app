@@ -367,16 +367,16 @@ CONTENT_TYPE_ICONS = settings["content_type_icons"]
 TAG_COLORS = settings["tag_colors"]
 
 records = get_user_records(USER_ID)
-
 # ==================================================
 # 設定ポップアップ（ダイアログ）定義
 # ==================================================
 @st.dialog("⚙️ 推し活ルールの設定", width="large")
 def open_settings_dialog():
-    # 編集用データのセッション初期化
+    # 編集用データのセッション初期化（変更前の旧ルール名も保持）
     if "editing_rules" not in st.session_state:
         st.session_state["editing_rules"] = [
             {
+                "old_name": k,
                 "name": k,
                 "amount": int(SAVING_RULES.get(k, 500)),
                 "icon": str(CONTENT_TYPE_ICONS.get(k, "📺")),
@@ -400,7 +400,12 @@ def open_settings_dialog():
             with c_icon:
                 new_icon = st.text_input("アイコン", value=item["icon"], key=f"rule_icon_{i}")
             
-            updated_rules.append({"name": new_name, "amount": new_amount, "icon": new_icon})
+            updated_rules.append({
+                "old_name": item.get("old_name"),
+                "name": new_name,
+                "amount": new_amount,
+                "icon": new_icon
+            })
 
     st.session_state["editing_rules"] = updated_rules
 
@@ -414,10 +419,17 @@ def open_settings_dialog():
     with c_add:
         if st.button("➕ 1つ増やす", disabled=len(st.session_state["editing_rules"]) >= 12, use_container_width=True):
             count = len(st.session_state["editing_rules"]) + 1
-            st.session_state["editing_rules"].append({"name": f"新ルール{count}", "amount": 500, "icon": "✨"})
+            st.session_state["editing_rules"].append({"old_name": None, "name": f"新ルール{count}", "amount": 500, "icon": "✨"})
             st.rerun()
 
     st.divider()
+
+    # 過去データ連動用チェックボックス
+    sync_past_records = st.checkbox(
+        "🔄 過去に登録したデータの種別名・金額も、新しい設定に一括更新する",
+        value=False,
+        help="チェックを入れると、変更前のルールで登録されていた過去データの種別名と金額が新しい設定に書き換わります。"
+    )
 
     # 保存 / キャンセル
     col_save, col_cancel = st.columns(2)
@@ -425,11 +437,20 @@ def open_settings_dialog():
         if st.button("💾 設定を保存", use_container_width=True, type="primary"):
             new_saving_rules = {}
             new_content_icons = {}
+
             for r in st.session_state["editing_rules"]:
                 name = r["name"].strip()
                 if name:
                     new_saving_rules[name] = int(r["amount"])
                     new_content_icons[name] = r["icon"]
+
+                    # チェックが入っていれば、旧ルールで保存された過去データを新ルール名・新金額へ一括更新
+                    if sync_past_records and r.get("old_name"):
+                        supabase.table("records") \
+                            .update({"content_type": name, "amount": int(r["amount"])}) \
+                            .eq("user_id", USER_ID) \
+                            .eq("content_type", r["old_name"]) \
+                            .execute()
 
             supabase.table("user_settings").upsert({
                 "user_id": USER_ID,
@@ -440,28 +461,13 @@ def open_settings_dialog():
 
             st.cache_data.clear()
             st.session_state.pop("editing_rules", None)
-            st.success("設定を更新しました！")
+            st.success("設定を更新しました！" + ("（過去データも更新完了）" if sync_past_records else ""))
             st.rerun()
 
     with col_cancel:
         if st.button("キャンセル", use_container_width=True):
             st.session_state.pop("editing_rules", None)
             st.rerun()
-
-# ==================================================
-# サイドバー
-# ==================================================
-with st.sidebar:
-    st.markdown("### 💖 推し活貯金")
-    st.caption(USER_EMAIL or "ログイン中")
-    
-    if st.button("⚙️ 貯金ルールを設定", use_container_width=True):
-        open_settings_dialog()
-        
-    st.caption(f"YouTube API：本日 {get_api_usage_today()} / {API_DAILY_LIMIT} 回")
-    
-    if st.button("🚪 ログアウト", use_container_width=True):
-        st.logout()
 
 # ==================================================
 # メイン画面：ダッシュボード
