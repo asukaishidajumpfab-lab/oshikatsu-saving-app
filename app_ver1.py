@@ -369,40 +369,99 @@ TAG_COLORS = settings["tag_colors"]
 records = get_user_records(USER_ID)
 
 # ==================================================
-# サイドバー設定
+# 設定ポップアップ（ダイアログ）定義
+# ==================================================
+@st.dialog("⚙️ 推し活ルールの設定", width="large")
+def open_settings_dialog():
+    # 編集用データのセッション初期化
+    if "editing_rules" not in st.session_state:
+        st.session_state["editing_rules"] = [
+            {
+                "name": k,
+                "amount": int(SAVING_RULES.get(k, 500)),
+                "icon": str(CONTENT_TYPE_ICONS.get(k, "📺")),
+            }
+            for k in SAVING_RULES
+        ]
+
+    rules_list = st.session_state["editing_rules"]
+    st.caption("最大12種類まで、推し活の種別・金額・アイコンを自由に変更できます。")
+
+    # トグル形式で一覧表示
+    updated_rules = []
+    for i, item in enumerate(rules_list):
+        expander_title = f"・{item['icon']} {item['name']}（{item['amount']:,}円）"
+        with st.expander(expander_title, expanded=False):
+            c_name, c_amount, c_icon = st.columns([2, 2, 1])
+            with c_name:
+                new_name = st.text_input("名称", value=item["name"], key=f"rule_name_{i}")
+            with c_amount:
+                new_amount = st.number_input("金額 (円)", min_value=0, step=100, value=item["amount"], key=f"rule_amount_{i}")
+            with c_icon:
+                new_icon = st.text_input("アイコン", value=item["icon"], key=f"rule_icon_{i}")
+            
+            updated_rules.append({"name": new_name, "amount": new_amount, "icon": new_icon})
+
+    st.session_state["editing_rules"] = updated_rules
+
+    # 項目の増減 (- / +)
+    st.write("---")
+    c_sub, c_add, _ = st.columns([1, 1, 2])
+    with c_sub:
+        if st.button("➖ 1つ減らす", disabled=len(st.session_state["editing_rules"]) <= 1, use_container_width=True):
+            st.session_state["editing_rules"].pop()
+            st.rerun()
+    with c_add:
+        if st.button("➕ 1つ増やす", disabled=len(st.session_state["editing_rules"]) >= 12, use_container_width=True):
+            count = len(st.session_state["editing_rules"]) + 1
+            st.session_state["editing_rules"].append({"name": f"新ルール{count}", "amount": 500, "icon": "✨"})
+            st.rerun()
+
+    st.divider()
+
+    # 保存 / キャンセル
+    col_save, col_cancel = st.columns(2)
+    with col_save:
+        if st.button("💾 設定を保存", use_container_width=True, type="primary"):
+            new_saving_rules = {}
+            new_content_icons = {}
+            for r in st.session_state["editing_rules"]:
+                name = r["name"].strip()
+                if name:
+                    new_saving_rules[name] = int(r["amount"])
+                    new_content_icons[name] = r["icon"]
+
+            supabase.table("user_settings").upsert({
+                "user_id": USER_ID,
+                "saving_rules": new_saving_rules,
+                "content_type_icons": new_content_icons,
+                "tag_colors": TAG_COLORS,
+            }, on_conflict="user_id").execute()
+
+            st.cache_data.clear()
+            st.session_state.pop("editing_rules", None)
+            st.success("設定を更新しました！")
+            st.rerun()
+
+    with col_cancel:
+        if st.button("キャンセル", use_container_width=True):
+            st.session_state.pop("editing_rules", None)
+            st.rerun()
+
+# ==================================================
+# サイドバー
 # ==================================================
 with st.sidebar:
     st.markdown("### 💖 推し活貯金")
     st.caption(USER_EMAIL or "ログイン中")
+    
+    if st.button("⚙️ 貯金ルールを設定", use_container_width=True):
+        open_settings_dialog()
+        
+    st.caption(f"YouTube API：本日 {get_api_usage_today()} / {API_DAILY_LIMIT} 回")
+    
     if st.button("🚪 ログアウト", use_container_width=True):
         st.logout()
-
-    with st.expander("⚙️ 自分用設定"):
-        st.caption("金額・アイコンは他の利用者には影響しません。")
-        edited_rules = {}
-        edited_icons = {}
-        for content_type in DEFAULT_SAVING_RULES:
-            c1, c2 = st.columns([2, 1])
-            with c1:
-                edited_rules[content_type] = st.number_input(
-                    content_type, min_value=0, step=100, 
-                    value=int(SAVING_RULES.get(content_type, DEFAULT_SAVING_RULES[content_type])), 
-                    key=f"rule_{content_type}"
-                )
-            with c2:
-                edited_icons[content_type] = st.text_input(
-                    "アイコン", value=str(CONTENT_TYPE_ICONS.get(content_type, "📺")), 
-                    key=f"icon_{content_type}"
-                )
-        if st.button("💾 設定を保存", use_container_width=True):
-            supabase.table("user_settings").upsert({
-                "user_id": USER_ID, "saving_rules": edited_rules, 
-                "content_type_icons": edited_icons, "tag_colors": TAG_COLORS
-            }, on_conflict="user_id").execute()
-            st.cache_data.clear()
-            st.success("設定を保存しました！")
-            st.rerun()
-        st.caption(f"YouTube API：本日 {get_api_usage_today()} / {API_DAILY_LIMIT} 回")
 
 # ==================================================
 # メイン画面：ダッシュボード
