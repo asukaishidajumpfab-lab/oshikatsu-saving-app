@@ -367,6 +367,7 @@ CONTENT_TYPE_ICONS = settings["content_type_icons"]
 TAG_COLORS = settings["tag_colors"]
 
 records = get_user_records(USER_ID)
+
 # ==================================================
 # 設定ポップアップ（ダイアログ）定義
 # ==================================================
@@ -468,6 +469,21 @@ def open_settings_dialog():
         if st.button("キャンセル", use_container_width=True):
             st.session_state.pop("editing_rules", None)
             st.rerun()
+
+# ==================================================
+# サイドバー
+# ==================================================
+with st.sidebar:
+    st.markdown("### 💖 推し活貯金")
+    st.caption(USER_EMAIL or "ログイン中")
+    
+    if st.button("⚙️ 貯金ルールを設定", use_container_width=True):
+        open_settings_dialog()
+        
+    st.caption(f"YouTube API：本日 {get_api_usage_today()} / {API_DAILY_LIMIT} 回")
+    
+    if st.button("🚪 ログアウト", use_container_width=True):
+        st.logout()
 
 # ==================================================
 # メイン画面：ダッシュボード
