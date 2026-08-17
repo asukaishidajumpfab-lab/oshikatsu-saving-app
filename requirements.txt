@@ -3,3 +3,4 @@ supabase>=2.27
 plotly>=6
 pandas>=2.2
 requests>=2.31
+authlib
