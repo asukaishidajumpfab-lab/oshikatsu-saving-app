@@ -130,7 +130,7 @@ st.markdown(
     div[data-testid="stButton"] button:hover { border-color: #E9A9C4; background-color: #A8FFFF; color: #66384D; }
     [data-testid="stMetricValue"] { font-weight: 700; }
     .back-to-top {
-        position: fixed; right: 24px; bottom: 24px; z-index: 999999;
+        position: fixed; right: 24px; bottom: 70px; z-index: 999999;
         display: inline-block; padding: .55rem .9rem; border-radius: 999px;
         background: #E0FFFF; border: 1px solid #00BFFF; color: #4DD7E3 !important;
         font-size: .85rem; font-weight: 700; text-decoration: none !important;
@@ -407,6 +407,9 @@ with st.sidebar:
 # ==================================================
 # メイン画面：ダッシュボード
 # ==================================================
+# ページの最上部にアンカーを配置
+st.markdown('<div id="top"></div>', unsafe_allow_html=True)
+
 st.title("💖 推し活貯金")
 st.caption("YouTubeの推し活を記録して、楽しく貯金します ✨")
 
@@ -695,6 +698,7 @@ for week in weeks:
                 st.html(f'<div style="background:#F3F8F3;border:1px solid #C7DEC7;border-radius:12px;min-height:105px;padding:.4rem .3rem;text-align:center;margin-bottom:.35rem;"><div style="font-weight:700;color:#5A4650;">{day_num}</div><div style="font-size:1.25rem;margin-top:.55rem;color:#719471;">✓</div><div style="font-size:.68rem;color:#718071;">配信なし確認済み</div></div>')
             else:
                 st.html(f'<div style="background:#FFFFFF;border:1px solid #E8E8E8;border-radius:12px;min-height:105px;padding:.4rem .3rem;text-align:center;margin-bottom:.35rem;"><div style="font-weight:600;font-size:.82rem;color:#4DD7E3;">{day_num}</div></div>')
+
 # ==================================================
 # 検索・一覧画面
 # ==================================================
@@ -712,7 +716,6 @@ st.markdown('<div class="tag-search-title">🎀 タグから探す</div>', unsaf
 selected_tag = st.session_state.get("selected_search_tag")
 
 if sorted_tags:
-    # !important を追加して全体CSSを上書き
     tag_css_list = []
     for i, tag in enumerate(sorted_tags):
         color = TAG_SEARCH_COLORS[i % len(TAG_SEARCH_COLORS)]
@@ -737,6 +740,7 @@ if sorted_tags:
                 if st.button(tag, key=f"search_tag_{start+idx}", use_container_width=True):
                     st.session_state["selected_search_tag"] = None if selected_tag == tag else tag
                     st.rerun()
+
 if selected_tag:
     st.info(f"🏷️ {selected_tag} を表示中")
     if st.button("タグ検索を解除", key="clear_tag"):
@@ -826,7 +830,8 @@ else:
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
         st.divider()
+
 # ==================================================
-# 右下固定「一番上へ」
+# 右下固定「一番上へ」ボタン要素
 # ==================================================
-st.markdown('<div id="top"></div><a href="#top" class="back-to-top">↑ 一番上へ</a>', unsafe_allow_html=True)
+st.markdown('<a href="#top" class="back-to-top">↑ 一番上へ</a>', unsafe_allow_html=True)
