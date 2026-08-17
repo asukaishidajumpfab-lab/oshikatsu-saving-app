@@ -695,7 +695,6 @@ for week in weeks:
                 st.html(f'<div style="background:#F3F8F3;border:1px solid #C7DEC7;border-radius:12px;min-height:105px;padding:.4rem .3rem;text-align:center;margin-bottom:.35rem;"><div style="font-weight:700;color:#5A4650;">{day_num}</div><div style="font-size:1.25rem;margin-top:.55rem;color:#719471;">✓</div><div style="font-size:.68rem;color:#718071;">配信なし確認済み</div></div>')
             else:
                 st.html(f'<div style="background:#FFFFFF;border:1px solid #E8E8E8;border-radius:12px;min-height:105px;padding:.4rem .3rem;text-align:center;margin-bottom:.35rem;"><div style="font-weight:600;font-size:.82rem;color:#4DD7E3;">{day_num}</div></div>')
-
 # ==================================================
 # 検索・一覧画面
 # ==================================================
@@ -713,11 +712,22 @@ st.markdown('<div class="tag-search-title">🎀 タグから探す</div>', unsaf
 selected_tag = st.session_state.get("selected_search_tag")
 
 if sorted_tags:
-    tag_css = "".join([
-        f'.st-key-search_tag_{i} button{{background-color:{TAG_SEARCH_COLORS[i % len(TAG_SEARCH_COLORS)]};border:{"2px solid #555555" if selected_tag == tag else "1px solid " + TAG_SEARCH_COLORS[i % len(TAG_SEARCH_COLORS)]};border-radius:999px;color:#5A4650;font-weight:600;padding:.35rem .8rem;margin:0;}}'
-        for i, tag in enumerate(sorted_tags)
-    ])
-    st.markdown(f"<style>{tag_css}</style>", unsafe_allow_html=True)
+    # !important を追加して全体CSSを上書き
+    tag_css_list = []
+    for i, tag in enumerate(sorted_tags):
+        color = TAG_SEARCH_COLORS[i % len(TAG_SEARCH_COLORS)]
+        border = "2px solid #555555" if selected_tag == tag else f"1px solid {color}"
+        tag_css_list.append(
+            f'.st-key-search_tag_{i} button {{ '
+            f'background-color: {color} !important; '
+            f'border: {border} !important; '
+            f'color: #5A4650 !important; '
+            f'border-radius: 999px !important; '
+            f'font-weight: 600 !important; '
+            f'padding: .35rem .8rem !important; '
+            f'margin: 0 !important; }}'
+        )
+    st.markdown(f"<style>{''.join(tag_css_list)}</style>", unsafe_allow_html=True)
     
     for start in range(0, len(sorted_tags), 5):
         row_tags = sorted_tags[start:start+5]
@@ -727,96 +737,6 @@ if sorted_tags:
                 if st.button(tag, key=f"search_tag_{start+idx}", use_container_width=True):
                     st.session_state["selected_search_tag"] = None if selected_tag == tag else tag
                     st.rerun()
-
-if selected_tag:
-    st.info(f"🏷️ {selected_tag} を表示中")
-    if st.button("タグ検索を解除", key="clear_tag"):
-        st.session_state["selected_search_tag"] = None
-        st.rerun()
-
-content_type_filter = st.selectbox("🎬 種別", ["すべて"] + list(SAVING_RULES.keys()), index=0)
-
-filtered = []
-for r in records:
-    tags = r.get("tags") or ""
-    searchable = f"{r.get('title','')} {r.get('channel_name','')} {r.get('content_type','')} {tags}".lower()
-    if search_text and search_text.lower() not in searchable:
-        continue
-    if content_type_filter != "すべて" and r.get("content_type") != content_type_filter:
-        continue
-    if selected_tag and selected_tag not in tags.split():
-        continue
-    filtered.append(r)
-
-st.caption(f"{len(filtered)}件表示")
-
-if not filtered:
-    st.info("該当する記録がありません。")
-else:
-    header = st.columns([4, 1.4, 1.5, 1, 1.2, 1.8, .8])
-    for col, label in zip(header, ["**タイトル**", "**配信枠**", "**種別**", "**金額**", "**公開日**", "**タグ**", "**編集**"]):
-        col.markdown(label)
-    st.divider()
-
-    for r in filtered:
-        record_id = r["id"]
-        row = st.columns([4, 1.4, 1.5, 1, 1.2, 1.8, .8])
-        with row[0]: st.markdown(f"[**{html.escape(str(r['title']))}**]({r['url']})")
-        with row[1]: st.write(r["channel_name"])
-        with row[2]: st.write(r["content_type"])
-        with row[3]: st.write(f"{int(r['amount']):,}円")
-        with row[4]: st.write(format_published_date(r["published_at"]))
-        with row[5]:
-            if r.get("tags"):
-                st.markdown(display_tags(r["tags"], TAG_COLORS), unsafe_allow_html=True)
-            else:
-                st.caption("タグなし")
-        with row[6]:
-            if st.button("編集", key=f"edit_{record_id}"):
-                st.session_state["editing_record_id"] = record_id
-                st.rerun()
-
-        if st.session_state.get("editing_record_id") == record_id:
-            st.markdown('<div style="background:#FFF8FB;border:1px solid #F0C6D8;border-radius:12px;padding:1rem;margin:.3rem 0 1rem;">', unsafe_allow_html=True)
-            st.markdown("### ✏️ 記録を編集")
-            st.caption(r["title"])
-            
-            saving_type_keys = list(SAVING_RULES.keys())
-            edited_type = st.selectbox("種別", saving_type_keys, index=saving_type_keys.index(r["content_type"]), key=f"editing_content_type_{record_id}")
-            edited_amount = int(SAVING_RULES[edited_type])
-            st.write(f"💰 貯金額：**{edited_amount:,}円**")
-            
-            current_tags = (r.get("tags") or "").split()
-            available_tags = list(sorted_tags)
-            for t in current_tags:
-                if t not in available_tags:
-                    available_tags.append(t)
-                    
-            edited_tags = st.multiselect("タグ", available_tags, default=current_tags, accept_new_options=True, key=f"editing_tags_{record_id}")
-            normalized_edited_tags = normalize_tags(edited_tags)
-            if normalized_edited_tags:
-                st.markdown(display_tags(normalized_edited_tags, TAG_COLORS), unsafe_allow_html=True)
-            else:
-                st.caption("タグなし")
-                
-            x, y = st.columns(2)
-            with x:
-                if st.button("💾 保存", use_container_width=True, key=f"save_record_{record_id}"):
-                    supabase.table("records").update({
-                        "content_type": edited_type, 
-                        "amount": edited_amount, 
-                        "tags": normalized_edited_tags
-                    }).eq("id", record_id).eq("user_id", USER_ID).execute()
-                    
-                    st.cache_data.clear()
-                    st.session_state.pop("editing_record_id", None)
-                    st.rerun()
-            with y:
-                if st.button("キャンセル", use_container_width=True, key=f"cancel_record_{record_id}"):
-                    st.session_state.pop("editing_record_id", None)
-                    st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-        st.divider()
 
 # ==================================================
 # 右下固定「一番上へ」
